@@ -278,17 +278,14 @@ def set_homepage_video(con, media_id) -> dict | None:
 
 
 def homepage_video_info(con) -> dict | None:
-    """The currently-picked home page video, with enough city/craft context
-    to show it on the dashboard, or None if nothing is picked."""
+    """The currently-picked home page video, or None if nothing is picked.
+    It has no city of its own (that's the whole point), so this is a plain
+    lookup by id - no join to cities needed, or it'd never match."""
     media_id = get_setting(con, "homepage_video_media_id", cast=int)
     if not media_id:
         return None
-    r = con.execute("""
-        SELECT m.id, m.local_path, m.poster_path, m.alt_text,
-               ci.name AS city_name, cr.name AS craft_name
-        FROM media m JOIN cities ci ON ci.id = m.city_id
-        LEFT JOIN crafts cr ON cr.id = m.craft_id
-        WHERE m.id = ?""", (media_id,)).fetchone()
+    r = con.execute("SELECT id, local_path, poster_path, alt_text FROM media WHERE id = ?",
+                    (media_id,)).fetchone()
     return dict(r) if r else None
 
 
