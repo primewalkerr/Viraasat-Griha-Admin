@@ -248,7 +248,15 @@ window.addEventListener("hashchange", () => {
 async function route() {
   const m = location.hash.match(/^#\/city\/([a-z0-9-]+)(?:\/(\w+))?/);
   window.scrollTo(0, 0);
-  if (m) {
+  if (location.hash === "#/home") {
+    state.city = null;
+    if (!state.cities) {
+      $("#app").replaceChildren(h("div", { class: "loading" }, "Loading…"));
+      try { await fetchCitiesData(); }
+      catch (err) { say(err.message, "err"); location.hash = "#/"; return; }
+    }
+    renderHomePage();
+  } else if (m) {
     state.tab = m[2] || "media";
     if (!state.city || state.city.city.slug !== m[1]) {
       $("#app").replaceChildren(h("div", { class: "loading" }, "Loading…"));
@@ -263,14 +271,16 @@ async function route() {
 }
 
 /* ============ cities page ============ */
+async function fetchCitiesData() {
+  const res = await api("/api/cities");
+  state.cities = res.cities; state.unassigned = res.unassigned;
+  state.allCrafts = res.crafts; state.categories = res.categories;
+  state.videos = res.videos; state.homepageVideo = res.homepage_video;
+}
+
 async function loadCities() {
-  try {
-    const res = await api("/api/cities");
-    state.cities = res.cities; state.unassigned = res.unassigned;
-    state.allCrafts = res.crafts; state.categories = res.categories;
-    state.videos = res.videos; state.homepageVideo = res.homepage_video;
-    renderCities();
-  } catch (err) { say(err.message, "err"); }
+  try { await fetchCitiesData(); renderCities(); }
+  catch (err) { say(err.message, "err"); }
 }
 
 function progress(have, good, total) {
@@ -290,9 +300,18 @@ function renderCities() {
   const parts = [top];
   if (state.adding) parts.push(newCityForm());
   if (state.unassigned.length) parts.push(renderUnassigned());
-  parts.push(renderHomepageVideo());
 
-  parts.push(h("div", { class: "cards" }, cities.map(c => {
+  const homeCard = h("a", { class: "card art", href: "#/home" },
+    h("div", { class: "img" }, "Home page"),
+    h("div", { class: "body" },
+      h("div", { class: "title" }, h("span", { class: "name" }, "Home page"), h("span", { style: "flex:1" }),
+        h("span", { class: "pill " + (state.homepageVideo ? "ok" : "") }, state.homepageVideo ? "Video set" : "No video")),
+      h("div", { class: "muted small" }, "Background video and other site-wide settings"),
+      h("ul", { class: "checks" },
+        h("li", {}, h("span", {}, progress(!!state.homepageVideo, state.homepageVideo ? 1 : 0, 1), "Background video"),
+          h("span", { class: "muted" }, state.homepageVideo ? state.homepageVideo.local_path : "none yet")))));
+
+  parts.push(h("div", { class: "cards" }, homeCard, cities.map(c => {
     const img = h("div", { class: "img" }, c.image_url ? "" : (c.name_hi || c.name));
     if (c.image_url) img.style.backgroundImage = `url("${c.image_url}")`;
     return h("a", { class: "card " + (c.category || "art"), href: `#/city/${c.slug}` }, img,
@@ -422,14 +441,14 @@ function renderHomepageVideo() {
     busy(btn, "Setting…", async () => {
       state.homepageVideo = await api("/api/settings/homepage-video", { media_id: sel.value });
       say("Home page video updated.", "ok");
-      renderCities();
+      renderHomePage();
     });
   });
   const unsetBtn = h("button", { class: "tiny danger" }, "Unset");
   unsetBtn.addEventListener("click", () => busy(unsetBtn, "Unsetting…", async () => {
     state.homepageVideo = await api("/api/settings/homepage-video", { media_id: null });
     say("Home page video unset.", "ok");
-    renderCities();
+    renderHomePage();
   }));
 
   const file = h("input", { type: "file", accept: "video/*", style: "display:none" });
@@ -444,8 +463,9 @@ function renderHomepageVideo() {
     if (!res.ok) throw new Error(j.error || res.statusText);
     file.value = "";
     state.homepageVideo = j;
-    await loadCities(); // refresh state.videos so the new upload shows in the picker too
+    await fetchCitiesData(); // refresh state.videos so the new upload shows in the picker too
     say("Uploaded and set as the home page video.", "ok");
+    renderHomePage();
   }));
 
   return h("section", { class: "panel", style: "margin-bottom:18px" },
@@ -458,6 +478,17 @@ function renderHomepageVideo() {
       : h("p", { class: "muted small" }, videos.length ? "Nothing chosen yet." : "No videos yet."),
     h("div", { class: "row", style: "gap:8px;margin-top:8px;flex-wrap:wrap" },
       videos.length ? sel : null, videos.length ? btn : null, file, upBtn));
+}
+
+/* ============ home page settings ============ */
+function renderHomePage() {
+  const head = h("div", {},
+    h("a", { href: "#/", class: "small" }, "← All cities"),
+    h("div", { class: "city-head", style: "margin-top:8px" }, h("h1", {}, "Home page")),
+    h("p", { class: "muted small", style: "margin:4px 0 0" }, "Settings for the site's home page, not tied to any one city."));
+  // More sections (e.g. featured picks, popular searches) can go here later,
+  // the same way each city page is a stack of independent sections.
+  $("#app").replaceChildren(head, renderHomepageVideo());
 }
 
 /* ============ city page ============ */
