@@ -260,11 +260,10 @@ def set_setting(con, key: str, value) -> None:
     con.commit()
 
 
-def set_homepage_video(con, slug: str, media_id) -> dict:
+def set_homepage_video(con, media_id) -> dict | None:
     """Pick (or unset, with media_id=None) the video that plays behind the
-    home page hero. Any cleared video from any city works - there's no
-    per-city scope to the setting itself, but the admin UI sets it from
-    whichever city page is open, so it returns that city's payload back."""
+    home page hero. Any cleared video from any city works - it's a single
+    site-wide choice, not scoped to one city."""
     if media_id not in (None, ""):
         m = con.execute("SELECT kind FROM media WHERE id = ?", (int(media_id),)).fetchone()
         if not m:
@@ -275,7 +274,33 @@ def set_homepage_video(con, slug: str, media_id) -> dict:
     else:
         media_id = None
     set_setting(con, "homepage_video_media_id", media_id)
-    return get_city(con, slug)
+    return homepage_video_info(con)
+
+
+def homepage_video_info(con) -> dict | None:
+    """The currently-picked home page video, with enough city/craft context
+    to show it on the dashboard, or None if nothing is picked."""
+    media_id = get_setting(con, "homepage_video_media_id", cast=int)
+    if not media_id:
+        return None
+    r = con.execute("""
+        SELECT m.id, m.local_path, m.poster_path, m.alt_text,
+               ci.name AS city_name, cr.name AS craft_name
+        FROM media m JOIN cities ci ON ci.id = m.city_id
+        LEFT JOIN crafts cr ON cr.id = m.craft_id
+        WHERE m.id = ?""", (media_id,)).fetchone()
+    return dict(r) if r else None
+
+
+def list_videos(con) -> list[dict]:
+    """Every video across every city, for the home page video picker."""
+    return [dict(r) for r in con.execute("""
+        SELECT m.id, m.local_path, m.poster_path, m.alt_text, m.permission,
+               ci.name AS city_name, ci.slug AS city_slug, cr.name AS craft_name
+        FROM media m JOIN cities ci ON ci.id = m.city_id
+        LEFT JOIN crafts cr ON cr.id = m.craft_id
+        WHERE m.kind = 'video'
+        ORDER BY ci.pin_number IS NULL, ci.pin_number, m.id DESC""")]
 
 
 def get_story(con, city_id: int, craft_id: int) -> list[dict]:

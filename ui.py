@@ -66,7 +66,8 @@ def api_config() -> dict:
 def api_cities(con) -> dict:
     return {"cities": sitedb.list_cities(con), "unassigned": sitedb.unassigned_reels(con),
             "crafts": [dict(r) for r in con.execute("SELECT id, name FROM crafts ORDER BY name")],
-            "categories": [dict(r) for r in con.execute("SELECT id, name FROM categories ORDER BY sort_order")]}
+            "categories": [dict(r) for r in con.execute("SELECT id, name FROM categories ORDER BY sort_order")],
+            "videos": sitedb.list_videos(con), "homepage_video": sitedb.homepage_video_info(con)}
 
 
 def api_geocode(con, query: str, anywhere: bool = False) -> list:
@@ -92,7 +93,7 @@ ROUTES_POST = [
     (r"/api/cities/([a-z0-9-]+)/delete", lambda con, s, b: sitedb.delete_city(con, s, b.get("confirm_name", ""))),
     (r"/api/cities/([a-z0-9-]+)/image", lambda con, s, b: sitedb.set_city_image(con, s, b.get("media_id"), b.get("which", ""))),
     (r"/api/cities/([a-z0-9-]+)/crafts/(\d+)/video", lambda con, s, cid, b: sitedb.set_craft_media(con, s, cid, b.get("media_id"))),
-    (r"/api/cities/([a-z0-9-]+)/homepage-video", lambda con, s, b: sitedb.set_homepage_video(con, s, b.get("media_id"))),
+    (r"/api/settings/homepage-video", lambda con, b: sitedb.set_homepage_video(con, b.get("media_id"))),
     (r"/api/cities/([a-z0-9-]+)/crafts", lambda con, s, b: sitedb.save_craft(con, s, b)),
     (r"/api/cities/([a-z0-9-]+)/crafts/(\d+)/unlink", lambda con, s, cid, b: sitedb.unlink_craft(con, s, cid)),
     (r"/api/cities/([a-z0-9-]+)/story", lambda con, s, b: sitedb.save_story(con, s, b.get("craft_id"), b.get("paragraphs"))),
