@@ -14,6 +14,7 @@ import time
 from datetime import date
 from pathlib import Path
 
+import cloud
 import pipeline as p
 
 SCHEMA_PATH = p.HERE / "schema.sql"
@@ -151,11 +152,20 @@ def _featured_craft(con, city_id: int):
                        (city_id,)).fetchone()
 
 
+def _is_url(path: str | None) -> bool:
+    return bool(path) and (path.startswith("http://") or path.startswith("https://"))
+
+
 def media_out(r) -> dict:
+    """local_path/poster_path hold either an absolute Cloudinary URL (anything
+    uploaded since the Turso blob migration) or a legacy relative path into
+    the media_files table - serve either as-is, but only check local disk for
+    the legacy case."""
     d = dict(r)
-    d["file_url"] = f"/media/{d['local_path']}" if d.get("local_path") else d.get("url")
-    d["poster_file_url"] = f"/media/{d['poster_path']}" if d.get("poster_path") else d.get("poster_url")
-    d["file_missing"] = bool(d.get("local_path")) and not (p.MEDIA_DIR / d["local_path"]).is_file()
+    local, poster = d.get("local_path"), d.get("poster_path")
+    d["file_url"] = local if _is_url(local) else (f"/media/{local}" if local else d.get("url"))
+    d["poster_file_url"] = poster if _is_url(poster) else (f"/media/{poster}" if poster else d.get("poster_url"))
+    d["file_missing"] = bool(local) and not _is_url(local) and not (p.MEDIA_DIR / local).is_file()
     return d
 
 
@@ -163,22 +173,29 @@ def _touch_city(con, city_id: int) -> None:
     con.execute("UPDATE cities SET updated_at = datetime('now') WHERE id = ?", (city_id,))
 
 
-def push_media_file(con, rel_path: str | None) -> None:
-    """Upload a file already saved under MEDIA_DIR into the media_files blob
-    table, keyed by the same relative path stored in media.local_path /
-    poster_path. The deployed site has no local disk of its own — it serves
-    /media/<path> straight out of this table, so a new upload or import isn't
-    visible there until this runs."""
+def push_media_file(con, rel_path: str | None) -> str | None:
+    """Upload a file already saved under MEDIA_DIR to Cloudinary and return
+    its CDN URL - that URL is what callers should store in media.local_path /
+    poster_path from here on, instead of the bare relative path.
+
+    Without Cloudinary credentials configured (e.g. running the tests), falls
+    back to the old behaviour: push the raw bytes into this DB's media_files
+    blob table and return the relative path unchanged, which is what the
+    deployed site used to serve /media/<path> out of."""
     if not rel_path:
-        return
+        return None
     full = p.MEDIA_DIR / rel_path
     if not full.is_file():
-        return
+        return None
+    if cloud.configured():
+        resource_type = "video" if full.suffix.lower() in p.VIDEO_EXT else "image"
+        return cloud.upload(full, rel_path, resource_type)
     data = full.read_bytes()
     content_type = mimetypes.guess_type(rel_path)[0] or "application/octet-stream"
     con.execute(
         "INSERT OR REPLACE INTO media_files (path, content_type, data, size) VALUES (?, ?, ?, ?)",
         (rel_path, content_type, data, len(data)))
+    return rel_path
 
 
 # ------------------------------------------------------------------ read
@@ -315,10 +332,10 @@ def upload_homepage_video(con, filename: str, data: bytes) -> dict:
     name = f"{int(time.time() * 1000)}-{stem}{ext}"
     (folder / name).write_bytes(data)
     rel_path = f"site/{name}"
-    push_media_file(con, rel_path)
+    url = push_media_file(con, rel_path)
     media_id = con.execute(
         "INSERT INTO media (kind, local_path, alt_text, permission) VALUES ('video', ?, ?, 'not_asked')",
-        (rel_path, "Home page background video")).lastrowid
+        (url, "Home page background video")).lastrowid
     set_setting(con, "homepage_video_media_id", media_id)
     con.commit()
     return homepage_video_info(con)
@@ -673,14 +690,15 @@ def add_post(con, slug: str, link: str, craft_id=None, downloader=None, use_clau
     if lk["platform"] == "youtube" and info.get("title") and info.get("title") not in (caption or ""):
         caption = f"{info['title']}\n\n{caption or ''}".strip()
     for it in items:
-        push_media_file(con, it["path"])
-        push_media_file(con, it.get("poster"))
+        video_url = push_media_file(con, it["path"])
+        poster_url = push_media_file(con, it.get("poster"))
         con.execute(
             "INSERT INTO media (kind, local_path, poster_path, alt_text, width, height, duration_s, "
             "credit_name, credit_url, permission, source_url, caption, reel_id, city_id, craft_id) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'not_asked', ?, ?, ?, ?, ?)",
-            (it["kind"], it["path"], it.get("poster"), alt, it.get("width"), it.get("height"),
+            (it["kind"], video_url, poster_url, alt, it.get("width"), it.get("height"),
              it.get("duration_s"), credit, credit_url, url, caption, reel_id, c["id"], craft_id))
+        con.commit()  # one item's upload+row at a time, so a slow upload can't roll back the next one's insert too
     _touch_city(con, c["id"])
     con.commit()
     out = get_city(con, slug)
@@ -707,8 +725,7 @@ def assign_reel(con, reel_id, slug: str, craft_id=None) -> dict:
         if r["video_path"]:
             name = Path(r["video_path"]).name
             if (p.MEDIA_DIR / name).is_file():
-                local = name
-                push_media_file(con, local)
+                local = push_media_file(con, name)
         con.execute(
             "INSERT INTO media (kind, local_path, alt_text, duration_s, credit_name, permission, "
             "source_url, caption, reel_id, city_id, craft_id) VALUES ('video', ?, ?, ?, ?, 'not_asked', ?, ?, ?, ?, ?)",
@@ -756,12 +773,12 @@ def add_photo_post(con, slug: str, link: str, data: bytes, ext: str, craft_id=No
     p.MEDIA_DIR.mkdir(parents=True, exist_ok=True)
     name = f"{shortcode}_photo{int(slide or 1)}{ext}"
     (p.MEDIA_DIR / name).write_bytes(data)
-    push_media_file(con, name)
+    url = push_media_file(con, name)
     craft = con.execute("SELECT name FROM crafts WHERE id = ?", (craft_id,)).fetchone() if craft_id else None
     mid = con.execute(
         "INSERT INTO media (kind, local_path, alt_text, credit_name, credit_url, permission, source_url, city_id, craft_id) "
         "VALUES ('photo', ?, ?, ?, ?, 'not_asked', ?, ?, ?)",
-        (name, alt_text or (f"{craft['name']} in {c['name']}" if craft else c["name"]), credit_name, credit_url,
+        (url, alt_text or (f"{craft['name']} in {c['name']}" if craft else c["name"]), credit_name, credit_url,
          source, c["id"], craft_id)).lastrowid
     _touch_city(con, c["id"])
     con.commit()
@@ -785,11 +802,11 @@ def add_upload(con, slug: str, filename: str, data: bytes, craft_id=None) -> dic
     name = f"{c['slug']}-{int(time.time() * 1000)}-{stem}{ext}"
     (folder / name).write_bytes(data)
     rel_path = f"uploads/{name}"
-    push_media_file(con, rel_path)
+    url = push_media_file(con, rel_path)
     craft = con.execute("SELECT name FROM crafts WHERE id = ?", (craft_id,)).fetchone() if craft_id else None
     con.execute("INSERT INTO media (kind, local_path, alt_text, permission, city_id, craft_id) "
                 "VALUES (?, ?, ?, 'not_asked', ?, ?)",
-                ("video" if ext in p.VIDEO_EXT else "photo", rel_path,
+                ("video" if ext in p.VIDEO_EXT else "photo", url,
                  f"{craft['name']} in {c['name']}" if craft else c["name"], c["id"], craft_id))
     _touch_city(con, c["id"])
     con.commit()

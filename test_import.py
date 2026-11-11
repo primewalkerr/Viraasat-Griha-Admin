@@ -80,8 +80,11 @@ class ImportTests(unittest.TestCase):
         p.DB_PATH = Path(self.tmp.name) / "t.db"
         p.MEDIA_DIR = Path(self.tmp.name) / "media"
         # These tests always want a throwaway local sqlite file, never the real
-        # Turso database a developer's .env may point at.
+        # Turso database a developer's .env may point at, and never a real
+        # upload to a developer's Cloudinary account either.
         self.saved_turso_url = os.environ.pop("TURSO_DATABASE_URL", None)
+        self.saved_cloudinary = {k: os.environ.pop(k, None) for k in
+                                  ("CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET")}
         self.picks = Path(self.tmp.name) / "khurja.json"
         real = json.loads((p.HERE / "picks" / "khurja.json").read_text())
         self.picks.write_text(json.dumps(real))
@@ -92,6 +95,9 @@ class ImportTests(unittest.TestCase):
         p.DB_PATH, p.MEDIA_DIR = self.saved
         if self.saved_turso_url is not None:
             os.environ["TURSO_DATABASE_URL"] = self.saved_turso_url
+        for k, v in self.saved_cloudinary.items():
+            if v is not None:
+                os.environ[k] = v
         self.tmp.cleanup()
 
     def downloader(self, url, code):

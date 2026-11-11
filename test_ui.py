@@ -38,8 +38,11 @@ class ServerTests(unittest.TestCase):
         p.DB_PATH = Path(cls.tmp.name) / "site.db"
         p.MEDIA_DIR = Path(cls.tmp.name) / "media"
         # Always a throwaway local sqlite file here, never the real Turso
-        # database a developer's .env may point at.
+        # database a developer's .env may point at, and never a real upload
+        # to a developer's Cloudinary account either.
         cls.saved_turso_url = os.environ.pop("TURSO_DATABASE_URL", None)
+        cls.saved_cloudinary = {k: os.environ.pop(k, None) for k in
+                                 ("CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET")}
         cls.downloads = 0
 
         def post(url, code):
@@ -95,6 +98,9 @@ class ServerTests(unittest.TestCase):
          ui.PLACES_KEY, ui.GEOCODER) = cls.saved
         if cls.saved_turso_url is not None:
             os.environ["TURSO_DATABASE_URL"] = cls.saved_turso_url
+        for k, v in cls.saved_cloudinary.items():
+            if v is not None:
+                os.environ[k] = v
         cls.tmp.cleanup()
 
     # ---- helpers

@@ -734,13 +734,27 @@ class _TursoCursor:
 
 class _TursoConnection:
     """Wraps a libsql connection so it's close enough to sqlite3.Connection
-    for sitedb.py/ui.py to use unchanged: wrapped cursors, dict-like rows."""
+    for sitedb.py/ui.py to use unchanged: wrapped cursors, dict-like rows.
 
-    def __init__(self, con):
+    Also reconnects once on "stream not found": Turso's Hrana stream for a
+    connection expires if it sits idle for a while (e.g. a slow yt-dlp
+    download running between two queries on the same request), and the next
+    query on it then fails with a 404 instead of being retried server-side."""
+
+    def __init__(self, con, database: str, auth_token: str):
         self._con = con
+        self._database = database
+        self._auth_token = auth_token
 
     def execute(self, sql, params=()):
-        return _TursoCursor(self._con.execute(sql, params))
+        try:
+            return _TursoCursor(self._con.execute(sql, params))
+        except Exception as e:
+            if "stream not found" not in str(e):
+                raise
+            import libsql
+            self._con = libsql.connect(database=self._database, auth_token=self._auth_token)
+            return _TursoCursor(self._con.execute(sql, params))
 
     def __getattr__(self, name):
         return getattr(self._con, name)
@@ -749,8 +763,9 @@ class _TursoConnection:
 def connect(path: Path | str | None = None) -> sqlite3.Connection:
     turso_url = os.environ.get("TURSO_DATABASE_URL")
     if path is None and turso_url:
+        auth_token = os.environ.get("TURSO_AUTH_TOKEN", "")
         import libsql
-        con = _TursoConnection(libsql.connect(database=turso_url, auth_token=os.environ.get("TURSO_AUTH_TOKEN", "")))
+        con = _TursoConnection(libsql.connect(database=turso_url, auth_token=auth_token), turso_url, auth_token)
     else:
         con = sqlite3.connect(path or DB_PATH, check_same_thread=False)
         con.row_factory = sqlite3.Row
