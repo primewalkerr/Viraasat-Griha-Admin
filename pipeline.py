@@ -702,9 +702,58 @@ def summarise_with_claude(caption: str, uploader: str | None) -> dict | None:
 
 
 # -------------------------------------------------------------------- 6. save
+class _Row(dict):
+    """A plain dict standing in for sqlite3.Row: supports both row["col"] and
+    dict(row), which is every access pattern this codebase uses. Needed because
+    libsql's Connection/Cursor are Rust-backed builtins with no row_factory
+    support at all, and return bare tuples."""
+
+
+class _TursoCursor:
+    def __init__(self, cur):
+        self._cur = cur
+
+    def _wrap(self, raw):
+        if raw is None:
+            return None
+        cols = [c[0] for c in self._cur.description]
+        return _Row(zip(cols, raw))
+
+    def fetchone(self):
+        return self._wrap(self._cur.fetchone())
+
+    def fetchall(self):
+        return [self._wrap(r) for r in self._cur.fetchall()]
+
+    def __iter__(self):
+        return iter(self.fetchall())
+
+    def __getattr__(self, name):
+        return getattr(self._cur, name)
+
+
+class _TursoConnection:
+    """Wraps a libsql connection so it's close enough to sqlite3.Connection
+    for sitedb.py/ui.py to use unchanged: wrapped cursors, dict-like rows."""
+
+    def __init__(self, con):
+        self._con = con
+
+    def execute(self, sql, params=()):
+        return _TursoCursor(self._con.execute(sql, params))
+
+    def __getattr__(self, name):
+        return getattr(self._con, name)
+
+
 def connect(path: Path | str | None = None) -> sqlite3.Connection:
-    con = sqlite3.connect(path or DB_PATH, check_same_thread=False)
-    con.row_factory = sqlite3.Row
+    turso_url = os.environ.get("TURSO_DATABASE_URL")
+    if path is None and turso_url:
+        import libsql
+        con = _TursoConnection(libsql.connect(database=turso_url, auth_token=os.environ.get("TURSO_AUTH_TOKEN", "")))
+    else:
+        con = sqlite3.connect(path or DB_PATH, check_same_thread=False)
+        con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
     have = {r["name"] for r in con.execute("PRAGMA table_info(reels)")}
     for col, typ in NEW_COLUMNS.items():
