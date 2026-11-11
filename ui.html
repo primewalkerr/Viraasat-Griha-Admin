@@ -1,0 +1,922 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Viraasat Admin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%239c3d1f'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #ffffff; --panel: #ffffff; --surface: #f7f6f4; --ink: #1f1b18; --muted: #75706a; --line: #ebe8e4;
+    --accent: #9c3d1f; --accent-ink: #fff; --accent-soft: #fbf1ec;
+    --ok: #2f6b45; --ok-soft: #eaf4ed; --warn: #8f6200; --warn-soft: #fcf5e3;
+    --err: #a3281c; --err-soft: #fbe9e6; --field: #fff;
+    --art: #1F2F5C; --food: #9C3B2E; --clothing: #A9803A;
+    --radius: 12px; --shadow: none; --field-line: #e2ded8; --lift: 0 4px 16px rgba(30,20,10,.07);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141312; --panel: #1b1a18; --surface: #242220; --ink: #efe9e2; --muted: #a39b93; --line: #2f2c29;
+      --accent: #e0835f; --accent-ink: #141312; --accent-soft: #2e211b;
+      --ok: #7cc496; --ok-soft: #1a2b21; --warn: #e2b75a; --warn-soft: #2e2615;
+      --err: #f08a7e; --err-soft: #331d1a; --field: #1b1a18;
+      --art: #8fa3dc; --food: #e0897c; --clothing: #d9b46a; --lift: none; --field-line: #38342f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 32px 20px 80px; }
+  .serif { font-family: Georgia, "Times New Roman", serif; }
+  h1 { font: 600 26px/1.2 Georgia, serif; margin: 0; }
+  h2 { font: 600 19px/1.3 Georgia, serif; margin: 0 0 10px; }
+  h3 { font: 600 15px/1.3 inherit; margin: 0 0 8px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+  .stack > * + * { margin-top: 16px; }
+  .topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-bottom: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .topbar .spacer { flex: 1; }
+
+  input, textarea, select { width: 100%; font: inherit; color: var(--ink); background: var(--field);
+    border: 1px solid var(--field-line); border-radius: 8px; padding: 9px 11px; transition: border-color .15s; }
+  input:hover, textarea:hover, select:hover { border-color: var(--muted); }
+  input[type=checkbox] { width: auto; }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+  textarea { resize: vertical; min-height: 64px; }
+  label.f { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .field .hint, .hint { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  .grid2 { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+  .grid3 { display: grid; gap: 12px; grid-template-columns: repeat(3, 1fr); }
+  .grid4 { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr); }
+  .span2 { grid-column: span 2; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row > .grow { flex: 1 1 260px; }
+
+  button { font: 600 14px/1 inherit; font-family: inherit; border-radius: 8px; padding: 10px 15px;
+           border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; white-space: nowrap; }
+  button.ghost { background: transparent; color: var(--accent); }
+  button.quiet { background: transparent; color: var(--muted); border-color: var(--line); }
+  button.danger { background: transparent; color: var(--err); border-color: var(--err-soft); }
+  button.tiny { padding: 6px 9px; font-size: 12.5px; }
+  button:disabled { opacity: .55; cursor: progress; }
+
+  .msg { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 20;
+         width: min(720px, calc(100% - 32px)); padding: 12px 14px; border-radius: 10px;
+         white-space: pre-wrap; display: none; box-shadow: 0 6px 24px rgba(0,0,0,.18); border: 1px solid var(--line); }
+  .msg.show { display: flex; gap: 10px; align-items: flex-start; }
+  .msg span { flex: 1; }
+  .msg.info { background: var(--panel); border-left: 4px solid var(--accent); }
+  .msg.ok { background: var(--panel); color: var(--ok); border-left: 4px solid var(--ok); }
+  .msg.err { background: var(--panel); color: var(--err); border-left: 4px solid var(--err); }
+  .msg button { padding: 0 4px; border: 0; background: none; color: inherit; font-size: 18px; }
+
+  .pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+          background: var(--surface); color: var(--muted); white-space: nowrap; }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.err { background: var(--err-soft); color: var(--err); }
+  .pill.accent { background: var(--accent-soft); color: var(--accent); }
+
+  /* cities grid */
+  .cards { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+  .card { display: block; text-decoration: none; color: inherit; background: var(--panel); border: 1px solid var(--line);
+          border-top: 3px solid var(--art); border-radius: var(--radius); overflow: hidden; transition: box-shadow .15s, transform .15s; }
+  .card:hover { box-shadow: var(--lift); transform: translateY(-1px); }
+  .card.food { border-top-color: var(--food); }
+  .card.clothing { border-top-color: var(--clothing); }
+  .card .img { aspect-ratio: 16/9; background: var(--surface) center/cover no-repeat; display: grid; place-items: center;
+               color: var(--muted); font: 600 28px Georgia, serif; }
+  .card .body { padding: 14px 16px 16px; }
+  .card .title { display: flex; align-items: baseline; gap: 8px; }
+  .card .pin { font: 600 13px Georgia, serif; color: var(--muted); }
+  .card .name { font: 600 18px Georgia, serif; }
+  .card .hi { color: var(--muted); font-size: 14px; }
+  .checks { list-style: none; margin: 10px 0 0; padding: 0; font-size: 13px; display: grid; gap: 3px; }
+  .checks li { display: flex; justify-content: space-between; gap: 6px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--line); margin-right: 6px; }
+  .dot.ok { background: var(--ok); } .dot.part { background: var(--warn); }
+
+  .unassigned { background: var(--warn-soft); border-color: transparent; }
+  .ua-item { display: grid; grid-template-columns: 1fr 200px auto; gap: 10px; align-items: center;
+             padding: 10px 0; border-top: 1px solid var(--line); }
+  .ua-item:first-of-type { border-top: 0; }
+
+  /* city page */
+  .city-head { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+  .city-head .pin { font: 600 18px Georgia, serif; color: var(--muted); }
+  .city-head h1 { font-size: 30px; }
+  .city-head .hi { font-size: 20px; color: var(--muted); }
+  .city-head .status { margin-left: auto; width: auto; }
+  .tagline { font: italic 16px Georgia, serif; color: var(--muted); margin: 4px 0 0; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 22px 0 22px; overflow-x: auto; }
+  .tabs a { padding: 10px 14px; margin-bottom: -1px; text-decoration: none; color: var(--muted); font-weight: 600; border-bottom: 3px solid transparent;
+            white-space: nowrap; }
+  .tabs a.on { color: var(--ink); border-bottom-color: var(--accent); }
+  .tabs .count { font-weight: 500; font-size: 12px; margin-left: 4px; }
+
+  .media-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .m-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
+  .m-card .preview { position: relative; background: #000; aspect-ratio: 4/5; }
+  .m-card video, .m-card img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .m-card .badges { position: absolute; top: 8px; left: 8px; display: flex; gap: 4px; }
+  .m-card .missing { position: absolute; inset: 0; display: grid; place-items: center; color: #ccc; padding: 16px; text-align: center; font-size: 13px; }
+  .m-card .meta { padding: 12px; display: grid; gap: 8px; }
+  .m-card .actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 12px; }
+  .perm-granted, .perm-own { border-color: var(--ok); }
+  .perm-refused { border-color: var(--err); }
+  .saved-tick { font-size: 12px; color: var(--ok); opacity: 0; transition: opacity .3s; }
+  .saved-tick.on { opacity: 1; }
+  details summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+  details .cap { white-space: pre-wrap; font-size: 13px; max-height: 160px; overflow: auto; margin-top: 6px; }
+
+  .src-sec + .src-sec { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .list-item { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: 14px; }
+  .list-item + .list-item { margin-top: 10px; }
+  .shop-sum { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+  .shop-sum .nm { font-weight: 600; font-size: 16px; }
+  .cands { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .cand { display: block; width: 100%; text-align: left; border: 0; border-radius: 0; border-bottom: 1px solid var(--line);
+          background: var(--field); color: var(--ink); padding: 10px 12px; font: 14px/1.4 inherit; font-family: inherit; cursor: pointer; white-space: normal; }
+  .cand:hover { background: var(--accent-soft); }
+  .cand small { display: block; color: var(--muted); }
+
+  .craft-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 7px 13px;
+          font: 600 14px inherit; font-family: inherit; cursor: pointer; }
+  .chip.on { border-color: var(--accent); background: var(--accent-soft); }
+  .para { border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 8px; padding: 12px; background: var(--panel); }
+  .para.checked { border-left-color: var(--ok); }
+  .para.disputed { border-left-color: var(--err); }
+  .para.unchecked { border-left-color: var(--warn); }
+  .para + .para { margin-top: 10px; }
+  .src { display: grid; grid-template-columns: 2fr 1.2fr 2fr 1fr auto; gap: 6px; margin-top: 6px; }
+  .note { background: var(--surface); border-radius: 8px; padding: 10px 12px; font-size: 13.5px; }
+  .sticky-save { position: sticky; bottom: 0; background: linear-gradient(transparent, var(--panel) 30%); padding: 14px 0 4px; display: flex; gap: 10px; align-items: center; }
+  .empty { color: var(--muted); padding: 20px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); }
+  .loading { color: var(--muted); padding: 30px; text-align: center; }
+
+  @media (max-width: 760px) {
+    .grid2, .grid3, .grid4 { grid-template-columns: 1fr 1fr; }
+    .span2 { grid-column: 1 / -1; }
+    .ua-item { grid-template-columns: 1fr; }
+    .src { grid-template-columns: 1fr 1fr; }
+    .city-head .status { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="msg" class="msg" role="status"><span></span><button type="button" aria-label="Dismiss">×</button></div>
+  <main id="app"><div class="loading">Loading…</div></main>
+</div>
+
+<script>
+/* ============ helpers ============ */
+const $ = s => document.querySelector(s);
+const STATUS_LABEL = { draft: "Draft", in_review: "In review", published: "Published", hidden: "Hidden" };
+const PERM_LABEL = { not_asked: "Not asked yet", requested: "Asked, waiting", granted: "Permission granted",
+                     refused: "Refused — don't use", own: "Our own" };
+const FACT_LABEL = { unchecked: "Not checked", checked: "Checked (2+ sources)", disputed: "Disputed" };
+let config = {};
+let state = { cities: null, unassigned: [], city: null, tab: "media", craftId: null };
+let dirty = false;
+
+function h(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (k === "class") e.className = v;
+    else if (k === "value") e.value = v;
+    else if (k === "checked") e.checked = !!v;
+    else if (k === "style") e.style.cssText = v;
+    else e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false)
+    e.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  return e;
+}
+const opt = (value, label, sel) => h("option", { value, selected: String(value) === String(sel ?? "") }, label);
+
+async function api(path, body, opts = {}) {
+  const init = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  Object.assign(init, opts);
+  const res = await fetch(path, init);
+  let data = {};
+  try { data = await res.json(); } catch {}
+  if (res.status === 404 && /not found/i.test(data.error || "") && path.startsWith("/api/") && !/No (city|craft|shop|reel|photo)/.test(data.error))
+    throw new Error("This page and its server don't match: an older ui.py may still be running. In Terminal run  pkill -f ui.py  then  python3 ui.py  and refresh.");
+  if (!res.ok) throw new Error(data.error || `${res.status} ${res.statusText}`);
+  return data;
+}
+
+function say(text, kind = "info") {
+  const m = $("#msg");
+  m.querySelector("span").textContent = text || "";
+  m.className = text ? `msg show ${kind}` : "msg";
+  if (kind === "ok") setTimeout(() => { if (m.querySelector("span").textContent === text) say(""); }, 3500);
+}
+$("#msg button").addEventListener("click", () => say(""));
+
+async function busy(btn, label, fn) {
+  const old = btn?.textContent;
+  if (btn) { btn.disabled = true; if (label) btn.textContent = label; }
+  try { return await fn(); }
+  catch (err) { say(err.message, "err"); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = old; } }
+}
+
+function markDirty() { dirty = true; }
+function confirmLeave() { return !dirty || confirm("You have unsaved changes. Leave without saving?"); }
+window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+function field(label, input, hint) {
+  return h("div", { class: "field" }, h("label", { class: "f" }, label), input, hint ? h("div", { class: "hint" }, hint) : null);
+}
+function inp(value, attrs = {}) { return h("input", { value: value ?? "", oninput: markDirty, ...attrs }); }
+function area(value, attrs = {}) { return h("textarea", { oninput: markDirty, ...attrs }, value ?? ""); }
+
+/* ============ routing ============ */
+let lastHash = location.hash;
+window.addEventListener("hashchange", () => {
+  if (!confirmLeave()) { history.replaceState(null, "", lastHash); return; }
+  dirty = false; lastHash = location.hash; route();
+});
+
+async function route() {
+  const m = location.hash.match(/^#\/city\/([a-z0-9-]+)(?:\/(\w+))?/);
+  window.scrollTo(0, 0);
+  if (m) {
+    state.tab = m[2] || "media";
+    if (!state.city || state.city.city.slug !== m[1]) {
+      $("#app").replaceChildren(h("div", { class: "loading" }, "Loading…"));
+      try { state.city = await api(`/api/cities/${m[1]}`); state.craftId = null; }
+      catch (err) { say(err.message, "err"); location.hash = "#/"; return; }
+    }
+    renderCity();
+  } else {
+    state.city = null;
+    await loadCities();
+  }
+}
+
+/* ============ cities page ============ */
+async function loadCities() {
+  try {
+    const res = await api("/api/cities");
+    state.cities = res.cities; state.unassigned = res.unassigned;
+    state.allCrafts = res.crafts; state.categories = res.categories;
+    renderCities();
+  } catch (err) { say(err.message, "err"); }
+}
+
+function progress(have, good, total) {
+  return h("span", { class: "dot " + (good >= total && total ? "ok" : have ? "part" : "") });
+}
+
+function renderCities() {
+  const cities = state.cities;
+  const published = cities.filter(c => c.status === "published").length;
+  const top = h("div", { class: "topbar" },
+    h("h1", {}, "Viraasat ", h("span", { style: "color:var(--accent)" }, "·"), " Cities"),
+    h("span", { class: "muted" }, `${cities.length} cities · ${published} published`),
+    h("span", { class: "spacer" }),
+    config.google_key ? null : h("span", { class: "pill warn", title: "Add GOOGLE_MAPS_API_KEY to .env for full shop details" }, "Google key not set"),
+    state.adding ? null : h("button", { onclick: () => { state.adding = true; renderCities(); $("#newCityName")?.focus(); } }, "+ Add city"));
+
+  const parts = [top];
+  if (state.adding) parts.push(newCityForm());
+  if (state.unassigned.length) parts.push(renderUnassigned());
+
+  parts.push(h("div", { class: "cards" }, cities.map(c => {
+    const img = h("div", { class: "img" }, c.image_url ? "" : (c.name_hi || c.name));
+    if (c.image_url) img.style.backgroundImage = `url("${c.image_url}")`;
+    return h("a", { class: "card " + (c.category || "art"), href: `#/city/${c.slug}` }, img,
+      h("div", { class: "body" },
+        h("div", { class: "title" }, h("span", { class: "pin" }, c.pin_number ?? ""), h("span", { class: "name" }, c.name),
+          h("span", { class: "hi" }, c.name_hi || ""), h("span", { style: "flex:1" }),
+          h("span", { class: "pill " + (c.status === "published" ? "ok" : c.status === "in_review" ? "accent" : "") }, STATUS_LABEL[c.status])),
+        h("div", { class: "muted small" }, [c.craft_name, c.state].filter(Boolean).join(" · ")),
+        h("ul", { class: "checks" },
+          h("li", {}, h("span", {}, progress(c.media_count, c.media_usable, 1), "Photos & videos"),
+            h("span", { class: "muted" }, c.media_count ? `${c.media_count} · ${c.media_usable} usable` : "none yet")),
+          h("li", {}, h("span", {}, progress(c.store_count, c.store_verified, 2), "Shops"),
+            h("span", { class: "muted" }, c.store_count ? `${c.store_count} · ${c.store_verified} verified` : "none yet")),
+          h("li", {}, h("span", {}, progress(c.story_count, c.story_checked, c.story_count), "Story"),
+            h("span", { class: "muted" }, c.story_count ? `${c.story_count} para · ${c.story_checked} checked` : "not written")))));
+  })));
+  $("#app").replaceChildren(...parts);
+}
+
+function newCityForm() {
+  const f = {
+    name: inp("", { id: "newCityName", required: true, placeholder: "e.g. Khajuraho" }),
+    name_hi: inp("", { lang: "hi", placeholder: "e.g. खजुराहो" }),
+    state: inp("", { required: true }), district: inp(""),
+    lat: inp("", { inputmode: "decimal" }), lon: inp("", { inputmode: "decimal" }),
+    aliases: inp("", { placeholder: "Other spellings, comma-separated" }),
+  };
+  const nextPin = Math.max(0, ...state.cities.map(c => c.pin_number || 0)) + 1;
+  const craftSel = h("select", { onchange: () => { newCraft.hidden = craftSel.value !== "__new"; } },
+    opt("__new", "A new craft…", "__new"), opt("", "Decide later", "__new"),
+    h("optgroup", { label: "Already in another city" }, (state.allCrafts || []).map(c => opt(c.id, c.name))));
+  const craftName = inp("", { placeholder: "e.g. Stone carving" });
+  const catSel = h("select", {}, (state.categories || []).map(c => opt(c.id, c.name)));
+  const newCraft = h("div", { class: "grid2" }, field("New craft name", craftName), field("Section", catSel));
+
+  const places = h("div");
+  const look = h("button", { type: "button", class: "ghost" }, "Look up");
+  const fill = pl => {
+    if (pl.city && !f.name.value.trim()) f.name.value = pl.city;
+    for (const k of ["state", "district", "lat", "lon"]) if (pl[k] != null) f[k].value = pl[k];
+    places.replaceChildren(h("div", { class: "hint" }, "Filled from OpenStreetMap: " + pl.display_name + ". © OpenStreetMap contributors"));
+  };
+  const lookup = () => busy(look, "Looking up…", async () => {
+    const q = f.name.value.trim();
+    if (q.length < 2) { f.name.focus(); return; }
+    const res = await api(`/api/geocode?q=${encodeURIComponent(q)}`);
+    if (!res.length) { places.replaceChildren(h("div", { class: "hint" }, `Nothing found for “${q}” in India. Fill in the state by hand.`)); return; }
+    if (res.length === 1) return fill(res[0]);
+    places.replaceChildren(h("div", { class: "cands" },
+      h("div", { class: "small muted", style: "padding:8px 12px" }, "Several places match. Pick one:"),
+      res.map(pl => h("button", { type: "button", class: "cand", onclick: () => fill(pl) },
+        h("b", {}, pl.city), " ", [pl.district, pl.state].filter(Boolean).join(" · "),
+        h("small", {}, `${pl.kind || "place"} · ${pl.lat}, ${pl.lon}`)))));
+  });
+  look.addEventListener("click", lookup);
+  f.name.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); lookup(); } });
+
+  const save = h("button", { type: "submit" }, "Add city");
+  const form = h("form", { class: "panel stack", style: "margin-bottom:18px;border-color:var(--accent)" },
+    h("div", { class: "row" }, h("h2", { style: "margin:0" }, "Add a city"),
+      h("span", { class: "muted small" }, `It gets map pin ${nextPin}; set its position on the map artwork later.`)),
+    h("div", { class: "row", style: "align-items:end" },
+      h("div", { class: "grow" }, field("City, town or village", f.name)), look),
+    places,
+    h("div", { class: "grid4" }, field("Name in Hindi", f.name_hi), field("State", f.state), field("District", f.district),
+      h("div", { class: "grid2" }, field("Latitude", f.lat), field("Longitude", f.lon))),
+    field("Featured craft", craftSel), newCraft,
+    field("Other names", f.aliases, "Used to recognise this city in Instagram captions."),
+    h("div", { class: "row" }, save,
+      h("button", { type: "button", class: "quiet", onclick: () => { if (!confirmLeave()) return; dirty = false; state.adding = false; renderCities(); } }, "Cancel")));
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    busy(save, "Adding…", async () => {
+      const data = {};
+      for (const [k, el] of Object.entries(f)) data[k] = el.value;
+      if (craftSel.value === "__new") { data.craft_name = craftName.value; data.category_id = catSel.value; }
+      else if (craftSel.value) data.craft_id = craftSel.value;
+      const res = await api("/api/cities", data);
+      dirty = false; state.adding = false; state.city = res;
+      say(`${res.city.name} added.`, "ok");
+      location.hash = `#/city/${res.city.slug}/details`;
+    });
+  });
+  return form;
+}
+
+function renderUnassigned() {
+  return h("section", { class: "panel unassigned", style: "margin-bottom:18px" },
+    h("h2", {}, "Reels waiting for a city"),
+    h("p", { class: "muted small", style: "margin:0 0 6px" }, "Saved before city pages existed. Choose where each belongs."),
+    state.unassigned.map(r => {
+      const sel = h("select", {}, opt("", "Choose a city…"), state.cities.map(c => opt(c.slug, `${c.pin_number}. ${c.name}`)));
+      const btn = h("button", { class: "tiny" }, "Add to city");
+      btn.addEventListener("click", () => {
+        if (!sel.value) { sel.focus(); return; }
+        busy(btn, "Adding…", async () => {
+          state.city = await api(`/api/reels/${r.id}/assign`, { city: sel.value });
+          say(`Added to ${state.city.city.name}.`, "ok");
+          location.hash = `#/city/${sel.value}/media`;
+        });
+      });
+      const delBtn = h("button", { class: "tiny danger" }, "Delete");
+      delBtn.addEventListener("click", () => {
+        if (!confirm("Delete this reel? This can't be undone.")) return;
+        busy(delBtn, "Deleting…", async () => {
+          await api(`/api/reels/${r.id}/delete`, {});
+          say("Reel deleted.", "ok");
+          await loadCities();
+        });
+      });
+      return h("div", { class: "ua-item" },
+        h("div", {}, h("b", {}, r.uploader || r.shortcode), " ", h("a", { href: r.url, target: "_blank", rel: "noopener", class: "small" }, "Open ↗"),
+          h("div", { class: "muted small" }, (r.caption || "(no caption)").slice(0, 140))),
+        sel, btn, delBtn);
+    }));
+}
+
+/* ============ city page ============ */
+const TABS = [["media", "Photos & videos"], ["shops", "Shops"], ["art", "About the art"], ["details", "City details"]];
+
+function renderCity() {
+  const { city, crafts, media, stores } = state.city;
+  const featured = crafts.find(c => c.is_featured) || crafts[0];
+  const statusSel = h("select", { class: "status", "aria-label": "Page status" },
+    Object.entries(STATUS_LABEL).map(([v, l]) => opt(v, l, city.status)));
+  statusSel.addEventListener("change", () => busy(null, null, async () => {
+    state.city = await api(`/api/cities/${city.slug}`, { status: statusSel.value });
+    say(`${city.name} is now ${STATUS_LABEL[statusSel.value].toLowerCase()}.`, "ok");
+  }));
+  const counts = { media: media.length, shops: stores.length,
+                   art: crafts.reduce((n, c) => n + c.story.length, 0) };
+  const head = h("div", {},
+    h("a", { href: "#/", class: "small" }, "← All cities"),
+    h("div", { class: "city-head", style: "margin-top:8px" },
+      h("span", { class: "pin" }, city.pin_number ?? ""), h("h1", {}, city.name), h("span", { class: "hi serif" }, city.name_hi || ""),
+      h("span", { class: "muted" }, [featured?.name, city.district, city.state].filter(Boolean).join(" · ")),
+      statusSel),
+    city.tagline ? h("p", { class: "tagline" }, city.tagline) : null,
+    h("nav", { class: "tabs" }, TABS.map(([k, l]) =>
+      h("a", { href: `#/city/${city.slug}/${k}`, class: state.tab === k ? "on" : "" }, l,
+        counts[k] !== undefined ? h("span", { class: "count muted" }, counts[k]) : null))));
+  const body = { media: renderMedia, shops: renderShops, art: renderArt, details: renderDetails }[state.tab] || renderMedia;
+  $("#app").replaceChildren(head, body());
+}
+
+function fmtDur(t) { t = Math.round(t); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60;
+  return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0"); }
+
+function setCity(data) { state.city = data; dirty = false; renderCity(); }
+
+/* ---------- Photos & videos ---------- */
+function craftSelect(selected, extra = {}) {
+  const crafts = state.city.crafts;
+  return h("select", extra, crafts.map(c => opt(c.id, c.name + (c.is_featured ? " ★" : ""), selected ?? crafts[0]?.id)));
+}
+
+function renderMedia() {
+  const { city, media, crafts } = state.city;
+  const many = crafts.length > 1;
+
+  /* --- Instagram --- */
+  const igLink = h("input", { type: "url", placeholder: "Paste an Instagram reel or post link…", class: "grow" });
+  const igCraft = many ? craftSelect(null, { style: "width:auto", "aria-label": "Craft" }) : null;
+  const igBtn = h("button", { type: "submit" }, "Add from Instagram");
+  const igAdd = () => {
+    if (!igLink.value.trim()) { igLink.focus(); return; }
+    if (/youtu\.?be/i.test(igLink.value)) { ytLink.value = igLink.value; igLink.value = ""; ytLink.focus(); say("That's a YouTube link, so it's moved to the YouTube section below.", "info"); return; }
+    return busy(igBtn, "Downloading…", async () => {
+      say("Downloading from Instagram… this can take up to a minute for videos.");
+      setCity(await api(`/api/cities/${city.slug}/posts`, { url: igLink.value.trim(), craft_id: igCraft?.value }));
+      say("Added. Check the credit, and ask the creator for permission before it goes on the site.", "ok");
+    });
+  };
+  const igForm = h("form", { class: "row", onsubmit: e => { e.preventDefault(); igAdd(); } }, igLink, igCraft, igBtn);
+  igLink.addEventListener("paste", () => setTimeout(() => { if (/instagram\.com\//i.test(igLink.value)) igAdd(); }, 0));
+
+  /* --- YouTube --- */
+  const ytLink = h("input", { type: "url", placeholder: "Paste a YouTube video or Shorts link…", class: "grow" });
+  const ytFrom = h("input", { placeholder: "0:00", inputmode: "numeric", style: "width:86px", "aria-label": "From" });
+  const ytTo = h("input", { placeholder: "0:00", inputmode: "numeric", style: "width:86px", "aria-label": "To" });
+  const ytCraft = many ? craftSelect(null, { style: "width:auto", "aria-label": "Craft" }) : null;
+  const ytBtn = h("button", { type: "submit" }, "Add from YouTube");
+  const ytAdd = () => {
+    if (!ytLink.value.trim()) { ytLink.focus(); return; }
+    if (/instagram\.com/i.test(ytLink.value)) { igLink.value = ytLink.value; ytLink.value = ""; say("That's an Instagram link, so it's moved to the Instagram section above.", "info"); igLink.focus(); return; }
+    const section = ytFrom.value.trim() || ytTo.value.trim();
+    return busy(ytBtn, "Downloading…", async () => {
+      say(section ? `Downloading ${ytFrom.value.trim() || "0:00"}–${ytTo.value.trim()} from YouTube… this can take a minute or two.`
+                  : "Downloading from YouTube… this can take a minute or two.");
+      const res = await api(`/api/cities/${city.slug}/posts`, { url: ytLink.value.trim(), start: ytFrom.value.trim(), end: ytTo.value.trim(), craft_id: ytCraft?.value });
+      setCity(res);
+      say(res.note || "Added. Check the credit, and ask the channel for permission before it goes on the site.", res.note ? "info" : "ok");
+    });
+  };
+  const ytForm = h("form", { class: "row", onsubmit: e => { e.preventDefault(); ytAdd(); } },
+    ytLink,
+    h("label", { class: "row small muted", style: "gap:6px" }, "From", ytFrom),
+    h("label", { class: "row small muted", style: "gap:6px" }, "To", ytTo),
+    ytCraft, ytBtn);
+  const ytHint = h("div", { class: "hint" },
+    "Shorts and videos up to 15 minutes download whole. For a longer video, give From and To (up to 10 minutes) to keep just the part with the artisan. "
+    + "You can add several parts of the same video.",
+    config.ffmpeg === false ? h("span", { style: "color:var(--warn)" }, " ffmpeg isn't installed, so videos come at low quality and From/To won't work. Fix: brew install ffmpeg, then restart ui.py.") : null);
+
+  /* --- Upload --- */
+  const file = h("input", { type: "file", accept: "image/*,video/*", multiple: true, style: "display:none" });
+  const upBtn = h("button", { type: "button", class: "ghost" }, "Upload photo or video");
+  upBtn.addEventListener("click", () => file.click());
+  file.addEventListener("change", () => busy(upBtn, "Uploading…", async () => {
+    let data;
+    for (const f of file.files) {
+      const q = new URLSearchParams({ name: f.name }); if (igCraft) q.set("craft_id", igCraft.value);
+      const res = await fetch(`/api/cities/${city.slug}/upload?${q}`, { method: "POST", body: f });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(`${f.name}: ${j.error || res.statusText}`);
+      data = j;
+    }
+    file.value = "";
+    if (data) { setCity(data); say("Uploaded.", "ok"); }
+  }));
+
+  const usable = media.filter(m => ["granted", "own"].includes(m.permission)).length;
+  const counts = { ig: 0, yt: 0, up: 0 };
+  for (const m of media) counts[sourceOf(m)]++;
+  const section = (title, sub, ...body) => h("div", { class: "src-sec" },
+    h("div", { class: "row", style: "margin-bottom:8px" }, h("h3", { style: "margin:0" }, title), h("span", { class: "muted small" }, sub)), ...body);
+  return h("div", { class: "stack" },
+    h("div", { class: "panel" },
+      section("Instagram", `${counts.ig} added`, igForm),
+      section("YouTube", `${counts.yt} added`, ytForm, ytHint),
+      section("From your computer", `${counts.up} added`, h("div", { class: "row" }, upBtn, file,
+        h("span", { class: "muted small" }, "Photos and videos creators send you, or photos saved from Instagram posts."))),
+      h("div", { class: "muted small", style: "margin-top:14px" },
+        `${media.length} item${media.length === 1 ? "" : "s"} · ${usable} cleared for the site. Only “Permission granted” or “Our own” can be published.`)),
+    media.length ? h("div", { class: "media-grid" }, media.map(mediaCard))
+                 : h("div", { class: "empty" }, "No photos or videos yet. Paste an Instagram or YouTube link above."));
+}
+
+function sourceOf(m) {
+  const u = m.source_url || "";
+  return /youtube\.com|youtu\.be/i.test(u) ? "yt" : /instagram\.com/i.test(u) ? "ig" : "up";
+}
+
+function mediaCard(m) {
+  const { city, crafts } = state.city;
+  let prev;
+  if (m.file_missing || !m.file_url) prev = h("div", { class: "missing" }, "File not found in the media folder.");
+  else if (m.kind === "video") prev = h("video", { src: m.file_url, poster: m.poster_file_url, controls: true, preload: "none", playsinline: true });
+  else prev = h("img", { src: m.file_url, alt: m.alt_text || "", loading: "lazy" });
+  const myCraft = m.craft_id ? crafts.find(cr => cr.id === m.craft_id) : null;
+  const badges = h("div", { class: "badges" },
+    city.hero_media_id === m.id ? h("span", { class: "pill accent" }, "Hero") : null,
+    city.card_media_id === m.id ? h("span", { class: "pill accent" }, "Card") : null,
+    myCraft && myCraft.making_media_id === m.id ? h("span", { class: "pill accent" }, "Story video") : null,
+    city.homepage_video_media_id === m.id ? h("span", { class: "pill accent" }, "Homepage video") : null);
+
+  const tick = h("span", { class: "saved-tick" }, "Saved ✓");
+  const save = async (patch) => {
+    try {
+      const upd = await api(`/api/media/${m.id}`, patch);
+      Object.assign(m, upd); tick.classList.add("on"); setTimeout(() => tick.classList.remove("on"), 1200);
+      perm.className = "perm-" + upd.permission;
+    } catch (err) { say(err.message, "err"); }
+  };
+  const perm = h("select", { class: "perm-" + m.permission }, Object.entries(PERM_LABEL).map(([v, l]) => opt(v, l, m.permission)));
+  perm.addEventListener("change", () => save({ permission: perm.value }));
+  const credit = h("input", { value: m.credit_name || "", placeholder: "Creator name" });
+  credit.addEventListener("change", () => save({ credit_name: credit.value }));
+  const creditUrl = h("input", { value: m.credit_url || "", placeholder: "https://instagram.com/…", type: "url" });
+  creditUrl.addEventListener("change", () => save({ credit_url: creditUrl.value }));
+  const alt = h("input", { value: m.alt_text || "", placeholder: "Describe what's shown" });
+  alt.addEventListener("change", () => save({ alt_text: alt.value }));
+  const craft = crafts.length > 1 ? craftSelect(m.craft_id) : null;
+  craft?.addEventListener("change", () => save({ craft_id: craft.value }));
+
+  const setImg = (which) => busy(null, null, async () => {
+    const current = city[`${which}_media_id`] === m.id;
+    setCity(await api(`/api/cities/${city.slug}/image`, { media_id: current ? null : m.id, which }));
+  });
+  const setStoryVideo = () => busy(null, null, async () => {
+    const current = myCraft && myCraft.making_media_id === m.id;
+    setCity(await api(`/api/cities/${city.slug}/crafts/${m.craft_id}/video`, { media_id: current ? null : m.id }));
+  });
+  const setHomepageVideo = () => busy(null, null, async () => {
+    const current = city.homepage_video_media_id === m.id;
+    setCity(await api(`/api/cities/${city.slug}/homepage-video`, { media_id: current ? null : m.id }));
+  });
+  const del = () => {
+    if (!confirm("Remove this from the city? The file stays in the media folder.")) return;
+    busy(null, null, async () => { await api(`/api/media/${m.id}/delete`, {}); setCity(await api(`/api/cities/${city.slug}`)); say("Removed.", "ok"); });
+  };
+  return h("div", { class: "m-card" },
+    h("div", { class: "preview" }, prev, badges),
+    h("div", { class: "meta" },
+      h("div", { class: "row", style: "justify-content:space-between" },
+        h("span", { class: "row", style: "gap:4px" },
+          h("span", { class: "pill" }, m.kind === "video" ? `Video${m.duration_s ? " · " + fmtDur(m.duration_s) : ""}` : "Photo"),
+          h("span", { class: "pill" }, { yt: "YouTube", ig: "Instagram", up: "Upload" }[sourceOf(m)]),
+          /[?&]t=\d+s/.test(m.source_url || "") ? h("span", { class: "pill", title: "Part of a longer video" }, "from " + fmtDur(+m.source_url.match(/[?&]t=(\d+)s/)[1])) : null),
+        tick),
+      field("Permission", perm),
+      h("div", { class: "grid2" }, field("Credit", credit), field("Credit link", creditUrl)),
+      field("Alt text", alt),
+      craft ? field("Craft", craft) : null,
+      m.caption ? h("details", {}, h("summary", {}, sourceOf(m) === "yt" ? "YouTube title and description" : "Instagram caption"), h("div", { class: "cap" }, m.caption)) : null),
+    h("div", { class: "actions" },
+      h("button", { class: "tiny ghost", onclick: () => setImg("hero") }, city.hero_media_id === m.id ? "Unset hero" : "Use as hero"),
+      m.kind === "photo" || m.poster_file_url ? h("button", { class: "tiny ghost", onclick: () => setImg("card") }, city.card_media_id === m.id ? "Unset card" : "Use as card") : null,
+      m.kind === "video" && m.craft_id ? h("button", { class: "tiny ghost", onclick: setStoryVideo },
+        myCraft && myCraft.making_media_id === m.id ? "Unset story video" : "Use as story video") : null,
+      m.kind === "video" ? h("button", { class: "tiny ghost", onclick: setHomepageVideo },
+        city.homepage_video_media_id === m.id ? "Unset homepage video" : "Use as homepage video") : null,
+      m.source_url ? h("a", { href: m.source_url, target: "_blank", rel: "noopener", class: "small", style: "align-self:center" }, sourceOf(m) === "yt" ? "YouTube ↗" : "Post ↗") : null,
+      h("span", { style: "flex:1" }),
+      h("button", { class: "tiny danger", onclick: del }, "Remove")));
+}
+
+/* ---------- Shops ---------- */
+let shopDraft = null;       // a new shop being added (from a link)
+let shopEditing = null;     // id of a saved shop being edited
+
+function renderShops() {
+  const { city, stores } = state.city;
+  const link = h("input", { type: "url", placeholder: "Paste a Google Maps link to the shop…", class: "grow" });
+  const btn = h("button", { type: "submit" }, "Find shop");
+  const cands = h("div");
+  const find = () => busy(btn, "Looking up…", async () => {
+    if (!link.value.trim()) { link.focus(); return; }
+    const res = await api("/api/shops/resolve", { url: link.value.trim() });
+    if (res.note) say(res.note, "info"); else say("");
+    if (res.candidates.length === 1) { shopDraft = { ...res.candidates[0] }; renderCity(); return; }
+    cands.replaceChildren(h("div", { class: "cands" },
+      h("div", { class: "small muted", style: "padding:8px 12px" }, "Google found several places. Pick the shop:"),
+      res.candidates.map(c => h("button", { type: "button", class: "cand", onclick: () => { shopDraft = { ...c }; renderCity(); } },
+        h("b", {}, c.name), c.rating ? `  ★ ${c.rating} (${c.rating_count || 0})` : "", h("small", {}, c.address || "")))));
+  });
+  const form = h("form", { class: "row", onsubmit: e => { e.preventDefault(); find(); } }, link, btn,
+    h("button", { type: "button", class: "ghost", onclick: () => { shopDraft = { name: "" }; renderCity(); } }, "Add by hand"));
+
+  const verified = stores.filter(s => s.verified).length;
+  return h("div", { class: "stack" },
+    h("div", { class: "panel stack" }, form, cands,
+      h("div", { class: "muted small" },
+        config.google_key
+          ? "Address, phone, website and rating come from Google Places. Google's terms allow keeping only the place ID long-term, so refresh the other details from Google before publishing."
+          : "No Google key set, so only the name and location are read from the link. Add GOOGLE_MAPS_API_KEY to the .env file for address, phone and rating."),
+      h("div", { class: "muted small" }, `${stores.length} shop${stores.length === 1 ? "" : "s"} · ${verified} verified. The city page shows up to 3 verified shops.`)),
+    shopDraft ? shopForm(shopDraft, true) : null,
+    stores.length ? h("div", {}, stores.map(s => shopEditing === s.id ? shopForm(s, false) : shopSummary(s)))
+                  : (shopDraft ? null : h("div", { class: "empty" }, "No shops yet. Paste a Google Maps link above.")));
+}
+
+function shopSummary(s) {
+  const { crafts } = state.city;
+  const names = crafts.filter(c => s.craft_ids.includes(c.id)).map(c => c.name);
+  return h("div", { class: "list-item" },
+    h("div", { class: "shop-sum" },
+      h("span", { class: "nm" }, s.name),
+      s.verified ? h("span", { class: "pill ok" }, "Verified") : h("span", { class: "pill warn" }, "Not verified"),
+      s.rating != null ? h("span", {}, `★ ${s.rating}`, h("span", { class: "muted small" }, ` (${s.rating_count ?? "?"}${s.rating_source ? ", " + s.rating_source : ""}${s.rating_checked_at ? ", checked " + s.rating_checked_at : ""})`)) : null,
+      h("span", { style: "flex:1" }),
+      h("button", { class: "tiny ghost", onclick: () => { shopEditing = s.id; shopDraft = null; renderCity(); } }, "Edit")),
+    h("div", { class: "muted small", style: "margin-top:4px" }, [s.address, s.phone].filter(Boolean).join(" · ") || "No address yet"),
+    h("div", { class: "row small", style: "margin-top:4px" },
+      s.maps_url ? h("a", { href: s.maps_url, target: "_blank", rel: "noopener" }, "Google Maps ↗") : null,
+      s.website ? h("a", { href: s.website, target: "_blank", rel: "noopener" }, "Website ↗") : null,
+      names.length ? h("span", { class: "muted" }, "Sells: " + names.join(", ")) : null));
+}
+
+function shopForm(s, isNew) {
+  const { city, crafts } = state.city;
+  const f = {};
+  const t = (k, label, attrs = {}) => field(label, f[k] = inp(s[k], attrs));
+  const checks = crafts.map(c => {
+    const cb = h("input", { type: "checkbox", value: c.id, checked: isNew ? c.is_featured : (s.craft_ids || []).includes(c.id), onchange: markDirty });
+    return h("label", { class: "row small", style: "gap:6px" }, cb, c.name);
+  });
+  const verified = h("input", { type: "checkbox", checked: !!s.verified, onchange: markDirty });
+  const save = h("button", { type: "submit" }, isNew ? "Save shop" : "Save changes");
+  const form = h("form", { class: "list-item stack", style: "border-color:var(--accent)" },
+    h("h3", {}, isNew ? "New shop" : `Edit ${s.name}`),
+    h("div", { class: "grid2" },
+      t("name", "Shop name", { required: true }), t("phone", "Phone"),
+      h("div", { class: "span2" }, t("address", "Address")),
+      t("postcode", "PIN code"), t("website", "Website", { type: "url" }),
+      h("div", { class: "span2" }, t("maps_url", "Google Maps link", { type: "url" }))),
+    h("div", { class: "grid4" },
+      t("rating", "Rating (0–5)", { inputmode: "decimal" }), t("rating_count", "Number of ratings", { inputmode: "numeric" }),
+      t("rating_source", "Rating from"), t("rating_checked_at", "Checked on", { type: "date" })),
+    h("div", { class: "grid2" }, t("lat", "Latitude", { inputmode: "decimal" }), t("lon", "Longitude", { inputmode: "decimal" })),
+    field("Sells", h("div", { class: "row", style: "gap:14px" }, checks)),
+    field("Notes", f.notes = area(s.notes, { rows: 2, placeholder: "Who you spoke to, what they make, prices…" })),
+    h("label", { class: "row", style: "gap:8px;font-weight:600" }, verified,
+      "Verified — someone has confirmed this shop is open and genuine"),
+    s.business_status && s.business_status !== "OPERATIONAL" ? h("div", { class: "pill err" }, `Google says: ${s.business_status.replace(/_/g, " ").toLowerCase()}`) : null,
+    h("div", { class: "row" }, save,
+      h("button", { type: "button", class: "quiet", onclick: () => { if (!confirmLeave()) return; dirty = false; shopDraft = null; shopEditing = null; renderCity(); } }, "Cancel"),
+      h("span", { style: "flex:1" }),
+      isNew ? null : h("button", { type: "button", class: "danger", onclick: () => {
+        if (!confirm(`Delete ${s.name}?`)) return;
+        busy(null, null, async () => { await api(`/api/stores/${s.id}/delete`, {}); shopEditing = null; setCity(await api(`/api/cities/${city.slug}`)); say("Shop deleted.", "ok"); });
+      } }, "Delete")));
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    busy(save, "Saving…", async () => {
+      const data = { id: isNew ? undefined : s.id, google_place_id: s.google_place_id, verified: verified.checked,
+                     craft_ids: checks.map(l => l.querySelector("input")).filter(c => c.checked).map(c => +c.value) };
+      for (const [k, el] of Object.entries(f)) data[k] = el.value;
+      const res = await api(`/api/cities/${city.slug}/stores`, data);
+      shopDraft = null; shopEditing = null; setCity(res); say("Shop saved.", "ok");
+    });
+  });
+  return form;
+}
+
+/* ---------- About the art ---------- */
+function renderArt() {
+  const { city, crafts, all_crafts, categories } = state.city;
+  if (!state.craftId || !crafts.some(c => c.id === state.craftId)) state.craftId = (crafts.find(c => c.is_featured) || crafts[0])?.id;
+  const craft = crafts.find(c => c.id === state.craftId);
+
+  const chips = h("div", { class: "craft-chips" },
+    crafts.map(c => h("button", { type: "button", class: "chip" + (c.id === state.craftId ? " on" : ""),
+      onclick: () => { if (!confirmLeave()) return; dirty = false; state.craftId = c.id; renderCity(); } },
+      c.name, c.is_featured ? " ★" : "")),
+    addCraftControl(city, all_crafts.filter(a => !crafts.some(c => c.id === a.id))));
+
+  return h("div", { class: "stack" },
+    h("div", { class: "panel stack" },
+      h("div", { class: "row" }, h("h2", { style: "margin:0" }, "Crafts in " + city.name),
+        h("span", { class: "muted small" }, "★ is the featured craft shown on the map and city card.")),
+      chips),
+    craft ? craftForm(craft, categories) : null,
+    craft ? storyEditor(craft) : null);
+}
+
+function addCraftControl(city, others) {
+  const sel = h("select", { style: "width:auto" }, opt("", "+ Add a craft…"),
+    h("optgroup", { label: "New" }, opt("__new", "A new craft…")),
+    others.length ? h("optgroup", { label: "Already in another city" }, others.map(o => opt(o.id, o.name))) : null);
+  sel.addEventListener("change", () => {
+    const v = sel.value; sel.value = "";
+    if (!v || !confirmLeave()) return;
+    let body;
+    if (v === "__new") {
+      const name = prompt("Name of the craft (e.g. Pietra dura):");
+      if (!name || !name.trim()) return;
+      body = { name: name.trim() };
+    } else body = { existing_id: +v };
+    busy(null, null, async () => {
+      const res = await api(`/api/cities/${city.slug}/crafts`, body);
+      state.craftId = v === "__new" ? res.crafts.find(c => c.name === body.name)?.id : +v;
+      setCity(res); say("Craft added.", "ok");
+    });
+  });
+  return sel;
+}
+
+function craftForm(c, categories) {
+  const { city, crafts } = state.city;
+  const f = {
+    name: inp(c.name, { required: true }), name_hi: inp(c.name_hi, { lang: "hi" }),
+    category_id: h("select", { onchange: markDirty }, categories.map(k => opt(k.id, k.name, c.category_id))),
+    short_desc: inp(c.short_desc, { placeholder: "e.g. silver inlay on dark metal", maxlength: 80 }),
+    materials: inp(c.materials, { placeholder: "e.g. zinc-copper alloy, silver wire, soil from the fort" }),
+    gi_year: inp(c.gi_year, { inputmode: "numeric", placeholder: "e.g. 2006", style: "max-width:120px" }),
+    keywords: inp((c.keywords || []).join(", "), { placeholder: "bidri, bidriware" }),
+    status: h("select", { onchange: markDirty }, Object.entries(STATUS_LABEL).map(([v, l]) => opt(v, l, c.status))),
+  };
+  const gi = h("input", { type: "checkbox", checked: !!c.gi_tag, onchange: () => { markDirty(); f.gi_year.disabled = !gi.checked; } });
+  f.gi_year.disabled = !gi.checked;
+  const save = h("button", { type: "submit" }, "Save craft");
+  const form = h("form", { class: "panel stack" },
+    h("div", { class: "row" }, h("h2", { style: "margin:0" }, c.name),
+      c.also_in.length ? h("span", { class: "muted small" }, "Also in " + c.also_in.join(", ") + " — changes here show there too.") : null),
+    h("div", { class: "grid3" }, field("Name", f.name), field("Name in Hindi", f.name_hi), field("Section", f.category_id)),
+    field("Short description", f.short_desc, "One line for the city card (max 80 characters)."),
+    field("Materials", f.materials),
+    h("div", { class: "grid3" },
+      field("GI tag", h("label", { class: "row", style: "gap:8px" }, gi, "Has a Geographical Indication tag", f.gi_year)),
+      field("Status", f.status),
+      field("Keywords", f.keywords, "Words that identify this craft in Instagram captions.")),
+    h("div", { class: "row" }, save,
+      c.is_featured ? h("span", { class: "pill accent" }, "★ Featured craft") :
+        h("button", { type: "button", class: "ghost", onclick: () => busy(null, null, async () => { setCity(await api(`/api/cities/${city.slug}/crafts`, { id: c.id, featured: true })); say(`${c.name} is now featured.`, "ok"); }) }, "Make featured"),
+      h("span", { style: "flex:1" }),
+      crafts.length > 1 ? h("button", { type: "button", class: "danger", onclick: () => {
+        if (!confirm(`Remove ${c.name} from ${city.name}? Its story for ${city.name} is deleted; the craft stays for other cities.`)) return;
+        busy(null, null, async () => { state.craftId = null; setCity(await api(`/api/cities/${city.slug}/crafts/${c.id}/unlink`, {})); say("Removed.", "ok"); });
+      } }, "Remove from city") : null));
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    busy(save, "Saving…", async () => {
+      const data = { id: c.id, gi_tag: gi.checked };
+      for (const [k, el] of Object.entries(f)) data[k] = el.value;
+      setCity(await api(`/api/cities/${city.slug}/crafts`, data)); say("Craft saved.", "ok");
+    });
+  });
+  return form;
+}
+
+function storyEditor(c) {
+  const { city } = state.city;
+  let paras = (c.story || []).map(p => ({ body: p.body, fact_status: p.fact_status, sources: p.sources.map(s => ({ ...s })) }));
+  const box = h("div");
+  const counter = h("span", { class: "muted small" });
+  const draw = () => {
+    const checked = paras.filter(p => p.fact_status === "checked").length;
+    counter.textContent = paras.length ? `${paras.length} paragraph${paras.length === 1 ? "" : "s"} · ${checked} checked` : "";
+    box.replaceChildren(...(paras.length ? paras.map((p, i) => paraEditor(p, i)) :
+      [h("div", { class: "empty" }, "No story yet. Add the first paragraph: what the craft is, where it comes from, how it's made.")]));
+  };
+  const paraEditor = (p, i) => {
+    const body = area(p.body, { rows: 4, placeholder: "Write one paragraph. Keep each fact traceable to its sources." });
+    body.addEventListener("input", () => { p.body = body.value; });
+    const fs = h("select", { style: "width:auto" }, Object.entries(FACT_LABEL).map(([v, l]) => opt(v, l, p.fact_status)));
+    fs.addEventListener("change", () => { markDirty(); p.fact_status = fs.value; el.className = "para " + fs.value; });
+    const move = d => { const j = i + d; if (j < 0 || j >= paras.length) return; [paras[i], paras[j]] = [paras[j], paras[i]]; markDirty(); draw(); };
+    const srcRows = h("div");
+    const drawSrc = () => srcRows.replaceChildren(...p.sources.map((s, k) => {
+      const mk = (key, ph, type) => { const x = inp(s[key], { placeholder: ph, type }); x.addEventListener("input", () => { s[key] = x.value; }); return x; };
+      return h("div", { class: "src" }, mk("title", "Source title"), mk("publisher", "Publisher"), mk("url", "https://…", "url"),
+        mk("accessed_on", "", "date"),
+        h("button", { type: "button", class: "tiny quiet", title: "Remove source", onclick: () => { p.sources.splice(k, 1); markDirty(); drawSrc(); } }, "×"));
+    }));
+    drawSrc();
+    const el = h("div", { class: "para " + p.fact_status },
+      h("div", { class: "row", style: "margin-bottom:8px" }, h("b", {}, `Paragraph ${i + 1}`), fs,
+        h("span", { style: "flex:1" }),
+        h("button", { type: "button", class: "tiny quiet", onclick: () => move(-1), disabled: i === 0 }, "↑"),
+        h("button", { type: "button", class: "tiny quiet", onclick: () => move(1), disabled: i === paras.length - 1 }, "↓"),
+        h("button", { type: "button", class: "tiny danger", onclick: () => { if (p.body.trim() && !confirm("Delete this paragraph?")) return; paras.splice(i, 1); markDirty(); draw(); } }, "Delete")),
+      body,
+      h("div", { class: "small", style: "margin-top:8px;font-weight:600" }, `Sources (${p.sources.length})`,
+        p.fact_status === "checked" && p.sources.length < 2 ? h("span", { class: "pill warn", style: "margin-left:6px" }, "needs 2") : null),
+      srcRows,
+      h("button", { type: "button", class: "tiny ghost", style: "margin-top:6px", onclick: () => { p.sources.push({ title: "", publisher: "", url: "", accessed_on: new Date().toISOString().slice(0, 10) }); markDirty(); drawSrc(); } }, "+ Add source"));
+    return el;
+  };
+  draw();
+  const save = h("button", {}, "Save story");
+  save.addEventListener("click", () => busy(save, "Saving…", async () => {
+    setCity(await api(`/api/cities/${city.slug}/story`, { craft_id: c.id, paragraphs: paras }));
+    say("Story saved.", "ok");
+  }));
+  return h("div", { class: "panel" },
+    h("div", { class: "row", style: "margin-bottom:6px" }, h("h2", { style: "margin:0" }, `The story of ${c.name} in ${city.name}`), counter),
+    h("p", { class: "muted small", style: "margin:0 0 12px" }, "Site rule: a paragraph is “checked” only when its facts match two published sources."),
+    box,
+    h("div", { class: "sticky-save" }, save,
+      h("button", { type: "button", class: "ghost", onclick: () => { paras.push({ body: "", fact_status: "unchecked", sources: [] }); markDirty(); draw(); box.lastChild?.querySelector("textarea")?.focus(); } }, "+ Add paragraph")));
+}
+
+/* ---------- City details ---------- */
+function renderDetails() {
+  const { city } = state.city;
+  const f = {
+    name_hi: inp(city.name_hi, { lang: "hi" }), tagline: inp(city.tagline, { placeholder: "Bidriware: silver that glows on dark metal" }),
+    state: inp(city.state, { required: true }), district: inp(city.district), country: inp(city.country),
+    lat: inp(city.lat, { inputmode: "decimal" }), lon: inp(city.lon, { inputmode: "decimal" }),
+    aliases: inp((city.aliases || []).join(", "), { placeholder: "banaras, kashi" }),
+  };
+  const places = h("div");
+  const look = h("button", { type: "button", class: "ghost" }, "Look up on OpenStreetMap");
+  look.addEventListener("click", () => busy(look, "Looking up…", async () => {
+    const res = await api(`/api/geocode?q=${encodeURIComponent(city.name + ", " + (f.state.value || city.state))}`);
+    const fill = pl => { for (const k of ["district", "state", "lat", "lon"]) if (pl[k] != null) f[k].value = pl[k]; markDirty(); places.replaceChildren(h("div", { class: "hint" }, "Filled from OpenStreetMap: " + pl.display_name + ". Check, then save. © OpenStreetMap contributors")); };
+    if (!res.length) { places.replaceChildren(h("div", { class: "hint" }, "Nothing found on OpenStreetMap.")); return; }
+    if (res.length === 1) return fill(res[0]);
+    places.replaceChildren(h("div", { class: "cands" }, res.map(pl => h("button", { type: "button", class: "cand", onclick: () => fill(pl) },
+      h("b", {}, pl.city), " ", [pl.district, pl.state, pl.postcode].filter(Boolean).join(" · "), h("small", {}, `${pl.kind || "place"} · ${pl.lat}, ${pl.lon}`)))));
+  }));
+  const save = h("button", { type: "submit" }, "Save details");
+  const form = h("form", { class: "panel stack" },
+    h("div", { class: "grid2" }, field("Name in Hindi", f.name_hi), field("Tagline", f.tagline, "The italic line under the city name on its page.")),
+    h("div", { class: "grid3" }, field("District", f.district), field("State", f.state), field("Country", f.country)),
+    h("div", { class: "grid3" }, field("Latitude", f.lat), field("Longitude", f.lon), h("div", { style: "align-self:end" }, look)),
+    places,
+    field("Other names", f.aliases, "Comma-separated. Used to recognise this city in Instagram captions."),
+    h("div", { class: "note" }, "Map pin ", h("b", {}, city.pin_number ?? "—"), ` at (${city.map_x ?? "?"}, ${city.map_y ?? "?"}) on the map artwork. Hero and card images are set from Photos & videos.`),
+    h("div", { class: "row" }, save));
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    busy(save, "Saving…", async () => {
+      const data = {}; for (const [k, el] of Object.entries(f)) data[k] = el.value;
+      setCity(await api(`/api/cities/${city.slug}`, data)); say("Details saved.", "ok");
+    });
+  });
+  return h("div", { class: "stack" }, form, removeCityPanel());
+}
+
+function removeCityPanel() {
+  const { city, media, stores, crafts } = state.city;
+  const paras = crafts.reduce((n, c) => n + c.story.length, 0);
+  const hide = h("button", { type: "button", class: "ghost", disabled: city.status === "hidden" }, city.status === "hidden" ? "Hidden" : "Hide from the site");
+  hide.addEventListener("click", () => busy(hide, "Hiding…", async () => {
+    setCity(await api(`/api/cities/${city.slug}`, { status: "hidden" }));
+    say(`${city.name} is hidden. Its content is kept; set the status back any time.`, "ok");
+  }));
+  const del = h("button", { type: "button", class: "danger" }, "Delete city…");
+  del.addEventListener("click", () => {
+    const typed = prompt(
+      `Delete ${city.name} permanently?\n\n` +
+      `This deletes ${stores.length} shop(s) and ${paras} story paragraph(s). ` +
+      `Its ${media.length} photo(s)/video(s) are removed from the city (files stay in the media folder) ` +
+      `and its Instagram reels go back to "waiting for a city".\n\nType ${city.name} to confirm:`);
+    if (typed === null) return;
+    busy(del, "Deleting…", async () => {
+      const res = await api(`/api/cities/${city.slug}/delete`, { confirm_name: typed });
+      dirty = false; state.city = null;
+      say(`${res.deleted} deleted.` + (res.crafts_removed.length ? ` Also removed craft: ${res.crafts_removed.join(", ")}.` : ""), "ok");
+      location.hash = "#/";
+    });
+  });
+  return h("div", { class: "panel stack", style: "border-color:var(--err-soft)" },
+    h("h3", {}, "Remove this city"),
+    h("p", { class: "muted small", style: "margin:0" },
+      "Hiding keeps everything and takes the city off the site. Deleting removes its shops and story for good."),
+    h("div", { class: "row" }, hide, del));
+}
+
+/* ============ start ============ */
+(async () => {
+  try { config = await api("/api/config"); } catch (err) { say(err.message, "err"); }
+  route();
+})();
+</script>
+</body>
+</html>

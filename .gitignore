@@ -1,0 +1,9 @@
+__pycache__/
+.DS_Store
+.env
+.env.local
+
+# Local-only artifacts: the deployed site reads neither of these anymore
+# (content and media both live in Turso) - this is just a local cache/fallback.
+media/
+viraasat.db
