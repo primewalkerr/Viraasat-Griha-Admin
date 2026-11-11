@@ -183,6 +183,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._run(with_db(sitedb.add_upload), m.group(1), qs.get("name", [""])[0], data,
                              qs.get("craft_id", [None])[0])
 
+        if re.fullmatch(r"/api/settings/homepage-video/upload", path):
+            if length > sitedb.MAX_UPLOAD:
+                return self._json({"error": "The file is larger than 300 MB."}, 413)
+            data = self.rfile.read(length)
+            return self._run(with_db(sitedb.upload_homepage_video), qs.get("name", [""])[0], data)
+
         if length > 2_000_000:
             return self._json({"error": "Request too large"}, 413)
         try:

@@ -413,7 +413,7 @@ function renderUnassigned() {
 function renderHomepageVideo() {
   const current = state.homepageVideo;
   const videos = state.videos || [];
-  const label = v => `${v.city_name}${v.craft_name ? " · " + v.craft_name : ""} · ${v.local_path}`;
+  const label = v => `${v.city_name || "Home page upload"}${v.craft_name ? " · " + v.craft_name : ""} · ${v.local_path}`;
   const sel = h("select", {}, opt("", "Choose a video…"),
     videos.map(v => opt(String(v.id), label(v), current ? String(current.id) : "")));
   const btn = h("button", { class: "tiny" }, "Set");
@@ -431,15 +431,33 @@ function renderHomepageVideo() {
     say("Home page video unset.", "ok");
     renderCities();
   }));
+
+  const file = h("input", { type: "file", accept: "video/*", style: "display:none" });
+  const upBtn = h("button", { type: "button", class: "ghost tiny" }, "Upload a different video");
+  upBtn.addEventListener("click", () => file.click());
+  file.addEventListener("change", () => busy(upBtn, "Uploading…", async () => {
+    const f = file.files[0];
+    if (!f) return;
+    const res = await fetch(`/api/settings/homepage-video/upload?${new URLSearchParams({ name: f.name })}`,
+      { method: "POST", body: f });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || res.statusText);
+    file.value = "";
+    state.homepageVideo = j;
+    await loadCities(); // refresh state.videos so the new upload shows in the picker too
+    say("Uploaded and set as the home page video.", "ok");
+  }));
+
   return h("section", { class: "panel", style: "margin-bottom:18px" },
     h("h2", {}, "Home page video"),
-    h("p", { class: "muted small", style: "margin:0 0 6px" }, "The video that plays behind the home page hero, any city."),
+    h("p", { class: "muted small", style: "margin:0 0 6px" }, "The video that plays behind the home page hero. Pick one already added to a city, or upload one just for this."),
     current
       ? h("div", { class: "row", style: "gap:10px;align-items:center;flex-wrap:wrap" },
-          h("span", {}, h("b", {}, current.city_name), current.craft_name ? ` · ${current.craft_name}` : "", ` · ${current.local_path}`),
+          h("span", {}, h("b", {}, current.city_name || "Home page upload"), current.craft_name ? ` · ${current.craft_name}` : "", ` · ${current.local_path}`),
           unsetBtn)
-      : h("p", { class: "muted small" }, videos.length ? "Nothing chosen yet." : "No videos yet - add one to a city first."),
-    videos.length ? h("div", { class: "row", style: "gap:8px;margin-top:8px" }, sel, btn) : null);
+      : h("p", { class: "muted small" }, videos.length ? "Nothing chosen yet." : "No videos yet."),
+    h("div", { class: "row", style: "gap:8px;margin-top:8px;flex-wrap:wrap" },
+      videos.length ? sel : null, videos.length ? btn : null, file, upBtn));
 }
 
 /* ============ city page ============ */

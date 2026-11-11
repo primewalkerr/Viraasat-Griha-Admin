@@ -293,14 +293,40 @@ def homepage_video_info(con) -> dict | None:
 
 
 def list_videos(con) -> list[dict]:
-    """Every video across every city, for the home page video picker."""
+    """Every video across every city, plus any uploaded just for the home
+    page (no city of their own), for the home page video picker."""
     return [dict(r) for r in con.execute("""
         SELECT m.id, m.local_path, m.poster_path, m.alt_text, m.permission,
                ci.name AS city_name, ci.slug AS city_slug, cr.name AS craft_name
-        FROM media m JOIN cities ci ON ci.id = m.city_id
+        FROM media m LEFT JOIN cities ci ON ci.id = m.city_id
         LEFT JOIN crafts cr ON cr.id = m.craft_id
         WHERE m.kind = 'video'
         ORDER BY ci.pin_number IS NULL, ci.pin_number, m.id DESC""")]
+
+
+def upload_homepage_video(con, filename: str, data: bytes) -> dict:
+    """Upload a video that's just for the home page background - not tied to
+    any city or craft - and set it as the current pick right away."""
+    ext = Path(filename or "").suffix.lower()
+    if ext not in p.VIDEO_EXT:
+        raise ValueError(f"Use a video file ({', '.join(sorted(p.VIDEO_EXT))}).")
+    if not data:
+        raise ValueError("The file is empty.")
+    if len(data) > MAX_UPLOAD:
+        raise ValueError("The file is larger than 300 MB.")
+    folder = p.MEDIA_DIR / "site"
+    folder.mkdir(parents=True, exist_ok=True)
+    stem = _slugify(Path(filename).stem)[:40]
+    name = f"{int(time.time() * 1000)}-{stem}{ext}"
+    (folder / name).write_bytes(data)
+    rel_path = f"site/{name}"
+    push_media_file(con, rel_path)
+    media_id = con.execute(
+        "INSERT INTO media (kind, local_path, alt_text, permission) VALUES ('video', ?, ?, 'not_asked')",
+        (rel_path, "Home page background video")).lastrowid
+    set_setting(con, "homepage_video_media_id", media_id)
+    con.commit()
+    return homepage_video_info(con)
 
 
 def get_story(con, city_id: int, craft_id: int) -> list[dict]:
