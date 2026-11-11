@@ -432,9 +432,9 @@ function renderUnassigned() {
 function renderHomepageVideo() {
   const current = state.homepageVideo;
   const videos = state.videos || [];
-  const label = v => `${v.city_name || "Home page upload"}${v.craft_name ? " · " + v.craft_name : ""} · ${v.local_path}`;
+  const fname = v => v.local_path.split("/").pop();
   const sel = h("select", {}, opt("", "Choose a video…"),
-    videos.map(v => opt(String(v.id), label(v), current ? String(current.id) : "")));
+    videos.map(v => opt(String(v.id), fname(v), current ? String(current.id) : "")));
   const btn = h("button", { class: "tiny" }, "Set");
   btn.addEventListener("click", () => {
     if (!sel.value) { sel.focus(); return; }
@@ -452,7 +452,7 @@ function renderHomepageVideo() {
   }));
 
   const file = h("input", { type: "file", accept: "video/*", style: "display:none" });
-  const upBtn = h("button", { type: "button", class: "ghost tiny" }, "Upload a different video");
+  const upBtn = h("button", { type: "button", class: "ghost tiny" }, "Upload a new video");
   upBtn.addEventListener("click", () => file.click());
   file.addEventListener("change", () => busy(upBtn, "Uploading…", async () => {
     const f = file.files[0];
@@ -470,12 +470,15 @@ function renderHomepageVideo() {
 
   return h("section", { class: "panel", style: "margin-bottom:18px" },
     h("h2", {}, "Home page video"),
-    h("p", { class: "muted small", style: "margin:0 0 6px" }, "The video that plays behind the home page hero. Pick one already added to a city, or upload one just for this."),
+    h("p", { class: "muted small", style: "margin:0 0 6px" }, "The video that plays behind the home page hero. Only videos uploaded here (not any city's videos) can be chosen."),
     current
-      ? h("div", { class: "row", style: "gap:10px;align-items:center;flex-wrap:wrap" },
-          h("span", {}, h("b", {}, current.city_name || "Home page upload"), current.craft_name ? ` · ${current.craft_name}` : "", ` · ${current.local_path}`),
-          unsetBtn)
-      : h("p", { class: "muted small" }, videos.length ? "Nothing chosen yet." : "No videos yet."),
+      ? h("div", { class: "stack", style: "gap:8px" },
+          h("video", { src: `/media/${current.local_path}`, poster: current.poster_path ? `/media/${current.poster_path}` : undefined,
+            controls: true, preload: "metadata", style: "max-width:360px;border-radius:8px" }),
+          h("div", { class: "row", style: "gap:10px;align-items:center;flex-wrap:wrap" },
+            h("span", { class: "muted small" }, "Currently playing: ", h("b", {}, fname(current))),
+            unsetBtn))
+      : h("p", { class: "muted small" }, videos.length ? "Nothing chosen yet." : "No videos uploaded here yet."),
     h("div", { class: "row", style: "gap:8px;margin-top:8px;flex-wrap:wrap" },
       videos.length ? sel : null, videos.length ? btn : null, file, upBtn));
 }
@@ -627,8 +630,7 @@ function mediaCard(m) {
   const badges = h("div", { class: "badges" },
     city.hero_media_id === m.id ? h("span", { class: "pill accent" }, "Hero") : null,
     city.card_media_id === m.id ? h("span", { class: "pill accent" }, "Card") : null,
-    myCraft && myCraft.making_media_id === m.id ? h("span", { class: "pill accent" }, "Story video") : null,
-    city.homepage_video_media_id === m.id ? h("span", { class: "pill accent" }, "Homepage video") : null);
+    myCraft && myCraft.making_media_id === m.id ? h("span", { class: "pill accent" }, "Story video") : null);
 
   const tick = h("span", { class: "saved-tick" }, "Saved ✓");
   const save = async (patch) => {
@@ -657,11 +659,6 @@ function mediaCard(m) {
     const current = myCraft && myCraft.making_media_id === m.id;
     setCity(await api(`/api/cities/${city.slug}/crafts/${m.craft_id}/video`, { media_id: current ? null : m.id }));
   });
-  const setHomepageVideo = () => busy(null, null, async () => {
-    const current = city.homepage_video_media_id === m.id;
-    await api(`/api/settings/homepage-video`, { media_id: current ? null : m.id });
-    setCity(await api(`/api/cities/${city.slug}`));
-  });
   const del = () => {
     if (!confirm("Remove this from the city? The file stays in the media folder.")) return;
     busy(null, null, async () => { await api(`/api/media/${m.id}/delete`, {}); setCity(await api(`/api/cities/${city.slug}`)); say("Removed.", "ok"); });
@@ -685,8 +682,6 @@ function mediaCard(m) {
       m.kind === "photo" || m.poster_file_url ? h("button", { class: "tiny ghost", onclick: () => setImg("card") }, city.card_media_id === m.id ? "Unset card" : "Use as card") : null,
       m.kind === "video" && m.craft_id ? h("button", { class: "tiny ghost", onclick: setStoryVideo },
         myCraft && myCraft.making_media_id === m.id ? "Unset story video" : "Use as story video") : null,
-      m.kind === "video" ? h("button", { class: "tiny ghost", onclick: setHomepageVideo },
-        city.homepage_video_media_id === m.id ? "Unset homepage video" : "Use as homepage video") : null,
       m.source_url ? h("a", { href: m.source_url, target: "_blank", rel: "noopener", class: "small", style: "align-self:center" }, sourceOf(m) === "yt" ? "YouTube ↗" : "Post ↗") : null,
       h("span", { style: "flex:1" }),
       h("button", { class: "tiny danger", onclick: del }, "Remove")));

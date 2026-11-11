@@ -292,16 +292,14 @@ def homepage_video_info(con) -> dict | None:
     return dict(r) if r else None
 
 
-def list_videos(con) -> list[dict]:
-    """Every video across every city, plus any uploaded just for the home
-    page (no city of their own), for the home page video picker."""
+def list_homepage_videos(con) -> list[dict]:
+    """Videos uploaded just for the home page (no city or craft of their
+    own) - what the home page video picker offers. City videos are managed
+    on their own city page and deliberately don't show up here."""
     return [dict(r) for r in con.execute("""
-        SELECT m.id, m.local_path, m.poster_path, m.alt_text, m.permission,
-               ci.name AS city_name, ci.slug AS city_slug, cr.name AS craft_name
-        FROM media m LEFT JOIN cities ci ON ci.id = m.city_id
-        LEFT JOIN crafts cr ON cr.id = m.craft_id
-        WHERE m.kind = 'video'
-        ORDER BY ci.pin_number IS NULL, ci.pin_number, m.id DESC""")]
+        SELECT id, local_path, poster_path, alt_text, permission
+        FROM media WHERE kind = 'video' AND city_id IS NULL
+        ORDER BY id DESC""")]
 
 
 def upload_homepage_video(con, filename: str, data: bytes) -> dict:

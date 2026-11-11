@@ -67,7 +67,7 @@ def api_cities(con) -> dict:
     return {"cities": sitedb.list_cities(con), "unassigned": sitedb.unassigned_reels(con),
             "crafts": [dict(r) for r in con.execute("SELECT id, name FROM crafts ORDER BY name")],
             "categories": [dict(r) for r in con.execute("SELECT id, name FROM categories ORDER BY sort_order")],
-            "videos": sitedb.list_videos(con), "homepage_video": sitedb.homepage_video_info(con)}
+            "videos": sitedb.list_homepage_videos(con), "homepage_video": sitedb.homepage_video_info(con)}
 
 
 def api_geocode(con, query: str, anywhere: bool = False) -> list:
