@@ -433,6 +433,7 @@ function renderHomepageVideo() {
   const current = state.homepageVideo;
   const videos = state.videos || [];
   const fname = v => v.local_path.split("/").pop();
+  const fileUrl = p => p && (/^https?:\/\//i.test(p) ? p : `/media/${p}`);
   const sel = h("select", {}, opt("", "Choose a video…"),
     videos.map(v => opt(String(v.id), fname(v), current ? String(current.id) : "")));
   const btn = h("button", { class: "tiny" }, "Set");
@@ -473,7 +474,7 @@ function renderHomepageVideo() {
     h("p", { class: "muted small", style: "margin:0 0 6px" }, "The video that plays behind the home page hero. Only videos uploaded here (not any city's videos) can be chosen."),
     current
       ? h("div", { class: "stack", style: "gap:8px" },
-          h("video", { src: `/media/${current.local_path}`, poster: current.poster_path ? `/media/${current.poster_path}` : undefined,
+          h("video", { src: fileUrl(current.local_path), poster: fileUrl(current.poster_path),
             controls: true, preload: "metadata", style: "max-width:360px;border-radius:8px" }),
           h("div", { class: "row", style: "gap:10px;align-items:center;flex-wrap:wrap" },
             h("span", { class: "muted small" }, "Currently playing: ", h("b", {}, fname(current))),

@@ -227,7 +227,7 @@ def list_cities(con) -> list[dict]:
                                    (d["hero_kind"], d["hero_path"], d["hero_poster"])):
             pick = poster if kind == "video" else path
             if pick:
-                img = f"/media/{pick}"
+                img = pick if _is_url(pick) else f"/media/{pick}"
                 break
         d["image_url"] = img
         out.append(d)
